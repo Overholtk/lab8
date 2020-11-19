@@ -33,9 +33,8 @@ function Location(city, geoData) {
 function handleWeather(req,res) {
   try {
     let weatherData = require('./data/weather.json');
-    let dateWeather = [];
-    weatherData.data.forEach((value) => {
-      dateWeather.push(new Forecast(value));
+    let dateWeather = weatherData.data.map((value) => {
+      new Forecast(value);
     })
     res.send(dateWeather);
   } catch (error) {
