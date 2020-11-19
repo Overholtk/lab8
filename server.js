@@ -6,6 +6,9 @@ require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const GEOCODE_API_KEY = process.env.GEOCODE_API_KEY;
+
+
 
 app.use(cors());
 
@@ -13,13 +16,24 @@ app.get('/location', handleLocation);
 app.get('/weather', handleWeather);
 
 function handleLocation(req,res) {
-  try {
-    let geoData = require('./data/location.json');
-    let city = req.query.city;
-    let locationData = new Location(city, geoData);
-    res.send(locationData);
-  } catch (error) {
-    console.error(error)
+  let city = req.query.city;
+  let url = `http://us1.locationiq.com/v1/search.php?key=${GEOCODE_API_KEY}&q=${city}&format=json&limit=1`
+  let locations = {};
+
+  if(locations[url]){
+    res.send(locations[url]);
+  } else {
+    superagent.get(url)
+    .then(data => {
+      const geoData = data.body[0];
+      const location = new Location(city, geoData);
+      locations[url] = location;
+
+      res.json(location);
+    })
+    .catch(() => {
+      console.error('error, please try again.')
+    });
   }
 }
 
@@ -33,9 +47,8 @@ function Location(city, geoData) {
 function handleWeather(req,res) {
   try {
     let weatherData = require('./data/weather.json');
-    let dateWeather = [];
-    weatherData.data.forEach((value) => {
-      dateWeather.push(new Forecast(value));
+    let dateWeather = weatherData.data.map((value) => {
+      new Forecast(value);
     })
     res.send(dateWeather);
   } catch (error) {
