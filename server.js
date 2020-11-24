@@ -1,6 +1,7 @@
 'use strict';
 
 const express = require('express');
+const superagent = require('superagent');
 const cors = require('cors');
 require('dotenv').config();
 
@@ -25,14 +26,14 @@ function handleLocation(req,res) {
   } else {
     superagent.get(url)
     .then(data => {
-      const geoData = data.body[0];
+      const geoData = data.body;
       const location = new Location(city, geoData);
       locations[url] = location;
 
       res.json(location);
     })
-    .catch(() => {
-      console.error('error, please try again.')
+    .catch((err) => {
+      console.error('error, please try again.', err)
     });
   }
 }
