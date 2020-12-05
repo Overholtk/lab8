@@ -11,6 +11,7 @@ const PORT = process.env.PORT || 3000;
 const GEOCODE_API_KEY = process.env.GEOCODE_API_KEY;
 const WEATHER_API_KEY = process.env.WEATHER_API_KEY;
 const TRAIL_API_KEY = process.env.TRAIL_API_KEY;
+const MOVIE_API_KEY = process.env.MOVIE_API_KEY;
 
 const client = new pg.Client(process.env.DATABASE_URL);
 
@@ -19,6 +20,7 @@ app.use(cors());
 app.get('/location', handleLocation);
 app.get('/weather', handleWeather);
 app.get('/trails', handleTrails);
+app.get('/movies', handleMovies);
 
 function handleLocation(req,res) {
   let city = req.query.city;
@@ -29,7 +31,6 @@ function handleLocation(req,res) {
   client.query(SQL)
   .then(results => {
     if(results.rows.length > 0){
-      console.log('in database:', results.rows);
       res.send(results.rows[0]);
     }else{
       superagent.get(url)
@@ -55,8 +56,6 @@ function handleLocation(req,res) {
     console.error('error, please try again.', err)
   });
 }
-
-
 
 function handleWeather(req,res) {
   let lat = req.query.latitude;
@@ -97,6 +96,25 @@ function handleTrails(req,res){
   })
 }
 
+function handleMovies(req,res){
+  let city = req.query.city || req.query.search_query;
+  let url = `https://api.themoviedb.org/3/search/movie?api_key=${MOVIE_API_KEY}&language=en-US&query=${city}&page=1&include_adult=false`;
+
+  superagent.get(url)
+  .then(data => {
+    return data.body.results;
+  })
+  .then(data => {
+    return data.map(movieData =>{
+      return new Movie(movieData);
+    })
+  })
+  .then(movies =>{
+    res.send(movies);
+  })
+  .catch(err => console.error(err))
+}
+
 function Location(city, geoData) {
   this.search_query = city;
   this.formatted_query = geoData[0].display_name;
@@ -119,6 +137,16 @@ function Trail(value){
   this.trail_url = value.url;
   this.conditions = value.conditionDetails;
   this.condition_date = value.conditionDate;
+}
+
+function Movie(value){
+  this.title = value.title;
+  this.overview = value.overview;
+  this.average_votes = value.vote_average;
+  this.total_votes = value.vote_count;
+  this.image_url = `https://image.tmdb.org/t/p/w500/${value.poster_path}`;
+  this.popularity = value.popularity;
+  this.released_on = value.release_date;
 }
 
 app.get('/location', (req, res) => {
