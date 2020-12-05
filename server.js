@@ -3,6 +3,7 @@
 const express = require('express');
 const superagent = require('superagent');
 const cors = require('cors');
+const pg = require('pg');
 require('dotenv').config();
 
 const app = express();
@@ -11,7 +12,7 @@ const GEOCODE_API_KEY = process.env.GEOCODE_API_KEY;
 const WEATHER_API_KEY = process.env.WEATHER_API_KEY;
 const TRAIL_API_KEY = process.env.TRAIL_API_KEY;
 
-
+const client = new pg.Client(process.env.DATABASE_URL);
 
 app.use(cors());
 
@@ -24,22 +25,38 @@ function handleLocation(req,res) {
   let url = `http://us1.locationiq.com/v1/search.php?key=${GEOCODE_API_KEY}&q=${city}&format=json&limit=1`
   let locations = {};
 
-  if(locations[url]){
-    res.send(locations[url]);
-  } else {
-    superagent.get(url)
-    .then(data => {
-      const geoData = data.body;
-      const location = new Location(city, geoData);
-      locations[url] = location;
-
-      res.json(location);
-    })
-    .catch((err) => {
-      console.error('error, please try again.', err)
-    });
-  }
+  let SQL = `SELECT * FROM locationdata WHERE search_query = '${city}';`;
+  client.query(SQL)
+  .then(results => {
+    if(results.rows.length > 0){
+      console.log('in database:', results.rows);
+      res.send(results.rows[0]);
+    }else{
+      superagent.get(url)
+      .then(data => {
+        console.log('hello!');
+        const geoData = data.body;
+        const location = new Location(city, geoData);
+        locations[url] = location;
+  
+        res.json(location);
+  
+        let cityName = city;
+        let latitude = location.latitude;
+        let longitude = location.longitude;
+        let formatted_query = location.formatted_query;
+        let values = [cityName, formatted_query, latitude, longitude];
+        let SQL = `INSERT INTO locationData (search_query, formatted_query, latitude, longitude) VALUES ($1, $2, $3, $4);`;
+        client.query(SQL, values);
+      })
+    }
+  })
+  .catch((err) => {
+    console.error('error, please try again.', err)
+  });
 }
+
+
 
 function handleWeather(req,res) {
   let lat = req.query.latitude;
@@ -108,7 +125,9 @@ app.get('/location', (req, res) => {
   throw new Error({status: 500, responseText: 'Sorry, something went wrong' });
 })
 
-
-app.listen(PORT, () => {
-  console.log('server up on port 3000');
-});
+client.connect()
+.then(() => {
+  app.listen(PORT, () => {
+    console.log(`server up on port ${PORT}`);
+  });
+})
